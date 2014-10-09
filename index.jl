@@ -2,17 +2,39 @@
 @require "Request" Request verb
 @require "Response" Response
 
+##
+# Support currying the first argument
+#
 serve(root::String; kw...) = req -> serve(root, req; kw...)
 
+##
+# Handle case where it has downstream middleware
+#
+function serve(root::String, next::Function; kw...)
+  function(req::Request)
+    res = serve(root, req; kw...)
+    403 < res.status < 406 ? next(req) : res
+  end
+end
+
+##
+# Fallback Request handler
+#
 function serve(root::String, r::Request; kw...)
   Response(verb(r) == "OPTIONS" ? 204 : 405, ["Allow"=>"HEAD,GET,OPTIONS"])
 end
 
+##
+# HEAD Request handler
+#
 function serve(root::String, r::Request{:HEAD}; kw...)
   res = serve(root, Request{:GET}(r.uri, r.meta, nothing); kw...)
   Response(res.status, res.meta, nothing)
 end
 
+##
+# GET Request handler
+#
 function serve(root::String, req::Request{:GET}; index="index.html")
   path = req.uri.path
 
@@ -53,7 +75,7 @@ end
 const cache = Dict{String,Dict{Symbol,Any}}()
 
 ##
-# Generate meta data about the file at `path`
+# Generate meta data about a file
 #
 function meta_data(path::String)
   stats = stat(path)
@@ -85,7 +107,7 @@ function meta_data(path::String)
 end
 
 ##
-# Complete `path` to a absolute file system path
+# Join `root` and `path` and do securty checks
 #
 function resolve(root::String, path::String)
   @assert !in('\0', path) "null bytes not allowed"
