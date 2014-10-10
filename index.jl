@@ -93,13 +93,16 @@ function meta_data(path::String)
 
   if compressible(mime)
     cpath = path * ".gz"
-    !ispath(cpath) && run(`gzip $path -kq`)
+    exists = ispath(cpath)
+    exists || run(`gzip $path -kq`)
     size = stat(cpath).size
 
     # make sure its actually smaller
     if size < stats.size
       meta[:cpath] = cpath
       meta[:csize] = string(size)
+    else
+      exists || rm(cpath)
     end
   end
 
