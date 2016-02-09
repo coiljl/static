@@ -26,7 +26,7 @@ static(root::AbstractString, r::Request; kw...) =
 #
 static(root::AbstractString, r::Request{:HEAD}; kw...) = begin
   res = static(root, Request{:GET}(r.uri, r.meta, r.data); kw...)
-  Response(res.status, res.meta, nothing)
+  Response(res.status, res.meta, "")
 end
 
 ##

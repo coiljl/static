@@ -1,8 +1,9 @@
-@require "server" start Response
-@require "static" serve
+@require "github.com/coiljl/server" serve Response
+@require ".." static
 
-function downstream(req)
-  Response(200, "Handled downstream")
-end
+downstream(req) = Response("Handled downstream")
 
-start(serve(".", downstream, index="index.jl"), 8000)
+const server = serve(static(".", downstream, index="Readme.ipynb"), 8000)
+
+println("Static server waiting at http://localhost:8000")
+wait(server)
