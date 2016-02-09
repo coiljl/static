@@ -1,47 +1,50 @@
-@require "mime" lookup compressible
-@require "Request" Request verb
-@require "Response" Response
+@require "github.com/coiljl/server" Request Response verb
+@require "github.com/coiljl/mime" lookup compressible
 
 ##
 # Support currying the first argument
 #
-serve(root::String; kw...) = req -> serve(root, req; kw...)
+static(root::AbstractString; kw...) = req -> static(root, req; kw...)
 
 ##
 # Handle case where it has downstream middleware
 #
-function serve(root::String, next::Function; kw...)
+static(root::AbstractString, next::Function; kw...) =
   function(req::Request)
-    res = serve(root, req; kw...)
+    res = static(root, req; kw...)
     403 < res.status < 406 ? next(req) : res
   end
-end
 
 ##
 # Fallback Request handler
 #
-function serve(root::String, r::Request; kw...)
-  Response(verb(r) == "OPTIONS" ? 204 : 405, ["Allow"=>"HEAD,GET,OPTIONS"])
-end
+static(root::AbstractString, r::Request; kw...) =
+  Response(verb(r) == "OPTIONS" ? 204 : 405, Dict("Allow"=>"HEAD,GET,OPTIONS"))
 
 ##
 # HEAD Request handler
 #
-function serve(root::String, r::Request{:HEAD}; kw...)
-  res = serve(root, Request{:GET}(r.uri, r.meta, nothing); kw...)
+static(root::AbstractString, r::Request{:HEAD}; kw...) = begin
+  res = static(root, Request{:GET}(r.uri, r.meta, r.data); kw...)
   Response(res.status, res.meta, nothing)
 end
 
 ##
 # GET Request handler
 #
-function serve(root::String, req::Request{:GET}; index="index.html")
+static(root::AbstractString, req::Request{:GET}; index="index.html") = begin
+  root = abspath(root)
   path = req.uri.path
 
   # index file support
   if isempty(path) || path[end] == '/' path *= index end
 
-  path = resolve(abspath(root), path)
+  '\0' in path && return Response(400, "null bytes not allowed")
+  # path is always relative to root
+  if startswith(path, '/') path = path[2:end] end
+  path = normpath(joinpath(root, path))
+  startswith(path, root) || return Response(400, "$(req.uri.path) out of bounds")
+
   isfile(path) || return Response(404)
   file = meta_data(path)
 
@@ -50,11 +53,11 @@ function serve(root::String, req::Request{:GET}; index="index.html")
     return Response(304)
   end
 
-  meta = [
+  meta = Dict(
     "Content-Length" => file[:size],
     "Content-Type" => file[:type],
     "ETag" => file[:etag]
-  ]
+  )
 
   # can send compressed version
   if haskey(file, :cpath) && accepts(req, "gzip")
@@ -68,28 +71,25 @@ function serve(root::String, req::Request{:GET}; index="index.html")
   Response(200, meta, stream)
 end
 
-function accepts(req::Request, encoding::String)
-  get(req.meta, "Accept-Encoding", nothing) == encoding
-end
+accepts(req::Request, encoding::AbstractString) = get(req.meta, "Accept-Encoding", "") == encoding
 
-const cache = Dict{String,Dict{Symbol,Any}}()
+const cache = Dict{AbstractString,Dict{Symbol,Any}}()
 
 ##
 # Generate meta data about a file
 #
-function meta_data(path::String)
+meta_data(path::AbstractString) = begin
   stats = stat(path)
   if haskey(cache, path) && stats.mtime === cache[path][:time]
     return cache[path]
   end
   mime = lookup(path)
   if mime === nothing mime = "application/octet-stream" end
-  meta = Dict{Symbol,Any}({
+  meta = Dict{Symbol,Any}(
     :etag => string(hash(open(readbytes, path))),
     :size => string(stats.size),
     :time => stats.mtime,
-    :type => mime
-  })
+    :type => mime)
 
   if compressible(mime)
     cpath = path * ".gz"
@@ -107,16 +107,4 @@ function meta_data(path::String)
   end
 
   return cache[path] = meta
-end
-
-##
-# Join `root` and `path` and do securty checks
-#
-function resolve(root::String, path::String)
-  @assert !in('\0', path) "null bytes not allowed"
-  # path is always relative to root
-  if beginswith(path, '/') path = path[2:end] end
-  path = normpath(joinpath(root, path))
-  @assert beginswith(path, root) "$path out of bounds"
-  return path
 end

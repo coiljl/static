@@ -1,4 +1,7 @@
-@require "server" start
-@require "static" serve
+@require "github.com/coiljl/server" serve
+@require ".." static
 
-start(serve(".", index="index.jl"), 8000)
+const server = serve(static(".", index="Readme.ipynb"), 8000)
+
+println("Static server waiting at http://localhost:8000")
+wait(server)
