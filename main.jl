@@ -1,37 +1,27 @@
-@require "github.com/coiljl/server" Request Response verb
+@require "github.com/jkroso/HTTP.jl/server" Request Response verb
 @require "github.com/coiljl/mime" lookup compressible
 
-##
-# Support currying the first argument
-#
+"Support currying the first argument"
 static(root::AbstractString; kw...) = req -> static(root, req; kw...)
 
-##
-# Handle case where it has downstream middleware
-#
+"Handle case where it has downstream middleware"
 static(root::AbstractString, next::Function; kw...) =
   function(req::Request)
     res = static(root, req; kw...)
     403 < res.status < 406 ? next(req) : res
   end
 
-##
-# Fallback Request handler
-#
+"Fallback Request handler"
 static(root::AbstractString, r::Request; kw...) =
   Response(verb(r) == "OPTIONS" ? 204 : 405, Dict("Allow"=>"HEAD,GET,OPTIONS"))
 
-##
-# HEAD Request handler
-#
+"HEAD Request handler"
 static(root::AbstractString, r::Request{:HEAD}; kw...) = begin
   res = static(root, Request{:GET}(r.uri, r.meta, r.data); kw...)
   Response(res.status, res.meta, "")
 end
 
-##
-# GET Request handler
-#
+"GET Request handler"
 static(root::AbstractString, req::Request{:GET}; index="index.html") = begin
   root = abspath(root)
   path = req.uri.path
@@ -53,11 +43,9 @@ static(root::AbstractString, req::Request{:GET}; index="index.html") = begin
     return Response(304)
   end
 
-  meta = Dict(
-    "Content-Length" => file[:size],
-    "Content-Type" => file[:type],
-    "ETag" => file[:etag]
-  )
+  meta = Dict("Content-Length" => file[:size],
+              "Content-Type" => file[:type],
+              "ETag" => file[:etag])
 
   # can send compressed version
   if haskey(file, :cpath) && accepts(req, "gzip")
@@ -67,7 +55,7 @@ static(root::AbstractString, req::Request{:GET}; index="index.html") = begin
   end
 
   stream = open(path)
-  finalizer(stream, close)
+  finalizer(close, stream)
   Response(200, meta, stream)
 end
 
@@ -75,9 +63,7 @@ accepts(req::Request, encoding::AbstractString) = get(req.meta, "Accept-Encoding
 
 const cache = Dict{AbstractString,Dict{Symbol,Any}}()
 
-##
-# Generate meta data about a file
-#
+"Generate meta data about a file"
 meta_data(path::AbstractString) = begin
   stats = stat(path)
   if haskey(cache, path) && stats.mtime === cache[path][:time]
@@ -86,7 +72,7 @@ meta_data(path::AbstractString) = begin
   mime = lookup(path)
   if mime === nothing mime = "application/octet-stream" end
   meta = Dict{Symbol,Any}(
-    :etag => string(hash(open(readbytes, path))),
+    :etag => string(hash(open(read, path))),
     :size => string(stats.size),
     :time => stats.mtime,
     :type => mime)

@@ -1,4 +1,4 @@
-@require "github.com/coiljl/server" serve
+@require "github.com/jkroso/HTTP.jl/server" serve
 @require ".." static
 
 const server = serve(static(".", index="Readme.ipynb"), 8000)
