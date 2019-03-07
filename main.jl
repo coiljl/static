@@ -22,7 +22,7 @@ static(root::AbstractString, r::Request{:HEAD}; kw...) = begin
 end
 
 "GET Request handler"
-static(root::AbstractString, req::Request{:GET}; index="index.html") = begin
+static(root::AbstractString, req::Request{:GET}; index="index.html", transform=identity) = begin
   root = abspath(root)
   path = req.uri.path
 
@@ -36,7 +36,7 @@ static(root::AbstractString, req::Request{:GET}; index="index.html") = begin
   startswith(path, root) || return Response(400, "$(req.uri.path) out of bounds")
 
   isfile(path) || return Response(404)
-  file = meta_data(path)
+  file = meta_data(path, transform)
 
   # cache is valid
   if get(req.meta, "If-None-Match", nothing) == file[:etag]
@@ -52,6 +52,8 @@ static(root::AbstractString, req::Request{:GET}; index="index.html") = begin
     path = file[:cpath]
     meta["Content-Encoding"] = "gzip"
     meta["Content-Length"] = file[:csize]
+  else
+    path = file[:path]
   end
 
   stream = open(path)
@@ -59,28 +61,29 @@ static(root::AbstractString, req::Request{:GET}; index="index.html") = begin
   Response(200, meta, stream)
 end
 
-accepts(req::Request, encoding::AbstractString) = get(req.meta, "Accept-Encoding", "") == encoding
+accepts(req::Request, encoding::String) = encoding in split(get(req.meta, "Accept-Encoding", ""), r", ?")
 
 const cache = Dict{AbstractString,Dict{Symbol,Any}}()
 
 "Generate meta data about a file"
-meta_data(path::AbstractString) = begin
+meta_data(path::AbstractString, transform) = begin
   stats = stat(path)
   if haskey(cache, path) && stats.mtime === cache[path][:time]
     return cache[path]
   end
-  mime = lookup(path)
+  tpath = transform(path)
+  mime = lookup(tpath)
   if mime === nothing mime = "application/octet-stream" end
   meta = Dict{Symbol,Any}(
-    :etag => string(hash(open(read, path))),
+    :etag => string(hash(read(path))),
     :size => string(stats.size),
     :time => stats.mtime,
-    :type => mime)
+    :type => mime,
+    :path => tpath)
 
   if compressible(mime)
-    cpath = path * ".gz"
-    exists = ispath(cpath)
-    exists || run(`gzip $path -kq`)
+    cpath = tpath * ".gz"
+    run(`gzip $tpath -kqnf`)
     size = stat(cpath).size
 
     # make sure its actually smaller
@@ -88,9 +91,9 @@ meta_data(path::AbstractString) = begin
       meta[:cpath] = cpath
       meta[:csize] = string(size)
     else
-      exists || rm(cpath)
+      rm(cpath)
     end
   end
 
-  return cache[path] = meta
+  cache[path] = meta
 end
