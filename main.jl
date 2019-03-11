@@ -67,8 +67,8 @@ const cache = Dict{AbstractString,Dict{Symbol,Any}}()
 
 "Generate meta data about a file"
 meta_data(path::AbstractString, transform) = begin
-  stats = stat(path)
-  if haskey(cache, path) && stats.mtime === cache[path][:time]
+  last_modified = mtime(path)
+  if haskey(cache, path) && last_modified === cache[path][:time]
     return cache[path]
   end
   tpath = transform(path)
@@ -76,8 +76,8 @@ meta_data(path::AbstractString, transform) = begin
   if mime === nothing mime = "application/octet-stream" end
   meta = Dict{Symbol,Any}(
     :etag => string(hash(read(path))),
-    :size => string(stats.size),
-    :time => stats.mtime,
+    :size => stat(tpath).size,
+    :time => last_modified,
     :type => mime,
     :path => tpath)
 
@@ -87,7 +87,7 @@ meta_data(path::AbstractString, transform) = begin
     size = stat(cpath).size
 
     # make sure its actually smaller
-    if size < stats.size
+    if size < stat(path).size
       meta[:cpath] = cpath
       meta[:csize] = string(size)
     else
