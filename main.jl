@@ -26,16 +26,18 @@ static(root::AbstractString, req::Request{:GET}; index="index.html", transform=i
   root = abspath(root)
   path = req.uri.path
 
-  # index file support
-  if isempty(path) || path[end] == '/' path *= index end
-
   '\0' in path && return Response(400, "null bytes not allowed")
   # path is always relative to root
   if startswith(path, '/') path = path[2:end] end
   path = normpath(joinpath(root, path))
   startswith(path, root) || return Response(400, "$(req.uri.path) out of bounds")
 
-  isfile(path) || return Response(404)
+  # index file support
+  if isdir(path) && isfile(joinpath(path, index))
+    path = joinpath(path, index)
+  end
+
+  ispath(path) || return Response(404)
   file = meta_data(path, transform)
 
   # cache is valid
