@@ -1,0 +1,97 @@
+#!/usr/bin/env julia --color=yes
+using Kip
+@require "github.com/jkroso/SimpleCLI.jl" @CLI
+import Sockets: listen, listenany, localhost, IPAddr
+
+"""
+Serve <directory> on <port>. If you don't define a port one will be selected
+randomly and printed to STDOUT
+"""
+@CLI (directory::String; port::Integer=get(ENV,"PORT",0), addr::String="localhost")
+
+host = addr == "localhost" ? localhost : parse(IPAddr, addr)
+
+const p, server = if port != 0
+  port, listen(host, port)
+else
+  listenany(host, 3000)
+end
+
+const path = normpath(joinpath(pwd(), directory))
+const root = isdir(path) ? path : dirname(path)
+
+println("Serving $path on $host:$p")
+
+# require late so we connect to the port ASAP
+@require "github.com/jkroso/HTTP.jl/server" handle_requests
+@require "github.com/jkroso/DOM.jl" @dom @css_str stylesheets Container HTML
+@require "github.com/jkroso/Rutherford.jl/Juno" render
+@require "github.com/coiljl/static" static
+@require "github.com/coiljl/logger" logger
+import Markdown
+
+function eval_file(file)
+  dom = Kip.eval_module(joinpath(pwd(), file))
+  dom isa Container{:html} && return dom
+  @dom[:html
+    [:head
+      [:title titlecase(replace(basename(splitext(file)[1]), "-" => " "))]
+      [:link href="/styles.less" rel="stylesheet"]
+      stylesheets[1]]
+    [:body dom]]
+end
+
+transform_file(fn, path, ext=".html") = begin
+  t = joinpath(tempdir(), string(hash(path))) * ext
+  open(fn, t, "w")
+  t
+end
+
+extension(path) = Symbol(isdir(path) ? "/" : splitext(path)[end][2:end])
+
+transform(path, mime=Val(extension(path))) = path
+
+transform(dir, ::Val{:/}) =
+  transform_file(dir) do io
+    names = readdir(dir)
+    show(io, "text/html", @dom[HTML
+      [:div css"""
+            display: flex
+            flex-direction: column
+            margin: 5em auto
+            width: max-content
+            border: 1px solid lightgrey
+            border-radius: 3px
+            > a {padding: 3px 10px; font-size: 1.2em; border-bottom: 1px solid lightgrey}
+            > a:last-child {border-bottom: none}
+            """
+        (@dom[:a href=joinpath("/", relpath(joinpath(dir, name), root)) name] for name in names)...]])
+  end
+
+transform(path, ::Val{:jade}) =
+  transform_file(path) do io
+    run(pipeline(path, `pug`, io))
+  end
+
+transform(path, ::Val{:jl}) =
+  transform_file(path) do io
+    show(io, "text/html", eval_file(path))
+  end
+
+transform(path, ::Val{:md}) =
+  transform_file(path) do io
+    show(io, "text/html", @dom[:html
+      [:head
+        [:title titlecase(replace(basename(splitext(path)[1]), "-"=>" "))]
+        [:style String(read(transform("$(@__DIR__)/styles.less", Val(:less))))]
+        stylesheets[1]]
+      [:body
+        [:div css"max-width: 35em; margin: 1em auto;" render(Markdown.parse(String(read(path))))]]])
+  end
+
+transform(path, ::Val{:less}) =
+  transform_file(path, ".css") do io
+    run(pipeline(`lessc $path`, io))
+  end
+
+handle_requests(logger(static(root, transform=transform, index="index.jl")), server)
