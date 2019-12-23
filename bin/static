@@ -83,7 +83,7 @@ transform(path, ::Val{:md}) =
     show(io, "text/html", @dom[:html
       [:head
         [:title titlecase(replace(basename(splitext(path)[1]), "-"=>" "))]
-        [:style String(read(transform("$(@__DIR__)/styles.less", Val(:less))))]
+        [:style String(read(transform("$(@dirname)/styles.less", Val(:less))))]
         stylesheets[1]]
       [:body
         [:div css"max-width: 35em; margin: 1em auto;" render(Markdown.parse(String(read(path))))]]])
