@@ -51,6 +51,7 @@ extension(path) = Symbol(isdir(path) ? "/" : splitext(path)[end][2:end])
 
 transform(path, mime=Val(extension(path))) = path
 
+"Render file directory"
 transform(dir, ::Val{:/}) =
   transform_file(dir) do io
     names = readdir(dir)
@@ -86,7 +87,7 @@ transform(path, ::Val{:md}) =
         [:style String(read(transform("$(@dirname)/styles.less", Val(:less))))]
         stylesheets[1]]
       [:body
-        [:div css"max-width: 35em; margin: 1em auto;" render(Markdown.parse(String(read(path))))]]])
+        [:div css"max-width: 50em; margin: 1em auto;" render(Markdown.parse(String(read(path))))]]])
   end
 
 transform(path, ::Val{:less}) =
