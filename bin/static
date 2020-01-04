@@ -17,10 +17,8 @@ else
   listenany(host, 3000)
 end
 
-const path = normpath(joinpath(pwd(), directory))
+const path = abspath(directory)
 const root = isdir(path) ? path : dirname(path)
-
-println("Serving $path on $host:$p")
 
 # require late so we connect to the port ASAP
 @require "github.com/jkroso/HTTP.jl/server" handle_requests
@@ -87,12 +85,15 @@ transform(path, ::Val{:md}) =
         [:style String(read(transform("$(@dirname)/styles.less", Val(:less))))]
         stylesheets[1]]
       [:body
-        [:div css"max-width: 50em; margin: 1em auto;" render(Markdown.parse(String(read(path))))]]])
+        [:div css"max-width: 50em; margin: 1em auto;" render(Markdown.parse_file(path, flavor=Markdown.github))]]])
   end
 
 transform(path, ::Val{:less}) =
   transform_file(path, ".css") do io
     run(pipeline(`lessc $path`, io))
   end
+
+const f = relpath(path, root)
+run(`open http://$host:$p/$(f == "." ? "" : f)`)
 
 handle_requests(logger(static(root, transform=transform, index="index.jl")), server)
