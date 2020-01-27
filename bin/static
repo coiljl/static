@@ -22,8 +22,8 @@ const root = isdir(path) ? path : dirname(path)
 
 # require late so we connect to the port ASAP
 @require "github.com/jkroso/HTTP.jl/server" handle_requests
-@require "github.com/jkroso/DOM.jl" @dom @css_str stylesheets Container HTML
-@require "github.com/jkroso/Rutherford.jl/Juno" render
+@require "github.com/jkroso/DOM.jl" @dom @css_str css need Container HTML
+@require "github.com/jkroso/Rutherford.jl/render.jl" render
 @require "github.com/coiljl/static" static
 @require "github.com/coiljl/logger" logger
 import Markdown
@@ -35,7 +35,7 @@ function eval_file(file)
     [:head
       [:title titlecase(replace(basename(splitext(file)[1]), "-" => " "))]
       [:link href="/styles.less" rel="stylesheet"]
-      stylesheets[1]]
+      need(css[])]
     [:body dom]]
 end
 
@@ -83,7 +83,7 @@ transform(path, ::Val{:md}) =
       [:head
         [:title titlecase(replace(basename(splitext(path)[1]), "-"=>" "))]
         [:style String(read(transform("$(@dirname)/styles.less", Val(:less))))]
-        stylesheets[1]]
+        need(css[])]
       [:body
         [:div css"max-width: 50em; margin: 1em auto;" render(Markdown.parse_file(path, flavor=Markdown.github))]]])
   end
