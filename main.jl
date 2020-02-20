@@ -1,5 +1,5 @@
-@require "github.com/jkroso/HTTP.jl/server" Request Response verb
-@require "github.com/coiljl/mime" lookup compressible
+@use "github.com/jkroso/HTTP.jl/server" Request Response verb
+@use "github.com/coiljl/mime" lookup compressible
 
 "Support currying the first argument"
 static(root::AbstractString; kw...) = req -> static(root, req; kw...)

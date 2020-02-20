@@ -1,6 +1,6 @@
 #!/usr/bin/env julia --color=yes
 using Kip
-@require "github.com/jkroso/SimpleCLI.jl" @CLI
+@use "github.com/jkroso/SimpleCLI.jl" @CLI
 import Sockets: listen, listenany, localhost, IPAddr
 
 """
@@ -20,12 +20,12 @@ end
 const path = abspath(directory)
 const root = isdir(path) ? path : dirname(path)
 
-# require late so we connect to the port ASAP
-@require "github.com/jkroso/HTTP.jl/server" handle_requests
-@require "github.com/jkroso/DOM.jl" @dom @css_str css need Container HTML
-@require "github.com/jkroso/Rutherford.jl/render.jl" render
-@require "github.com/coiljl/static" static
-@require "github.com/coiljl/logger" logger
+# use late so we connect to the port ASAP
+@use "github.com/jkroso/HTTP.jl/server" handle_requests
+@use "github.com/jkroso/DOM.jl" @dom @css_str css need Container HTML
+@use "github.com/jkroso/Rutherford.jl/draw.jl" doodle
+@use "github.com/coiljl/static" static
+@use "github.com/coiljl/logger" logger
 import Markdown
 
 function eval_file(file)
@@ -85,7 +85,7 @@ transform(path, ::Val{:md}) =
         [:style String(read(transform("$(@dirname)/styles.less", Val(:less))))]
         need(css[])]
       [:body
-        [:div css"max-width: 50em; margin: 1em auto;" render(Markdown.parse_file(path, flavor=Markdown.github))]]])
+        [:div css"max-width: 50em; margin: 1em auto;" doodle(Markdown.parse_file(path, flavor=Markdown.github))]]])
   end
 
 transform(path, ::Val{:less}) =

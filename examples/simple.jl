@@ -1,5 +1,5 @@
-@require "github.com/jkroso/HTTP.jl/server" serve
-@require ".." static
+@use "github.com/jkroso/HTTP.jl/server" serve
+@use ".." static
 
 const server = serve(static(".", index="Readme.ipynb"), 8000)
 

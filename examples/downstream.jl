@@ -1,5 +1,5 @@
-@require "github.com/jkroso/HTTP.jl/server" serve Response
-@require ".." static
+@use "github.com/jkroso/HTTP.jl/server" serve Response
+@use ".." static
 
 downstream(req) = Response("Handled downstream")
 
