@@ -26,6 +26,7 @@ const root = isdir(path) ? path : dirname(path)
 @use "github.com/coiljl/logger" logger
 
 const f = relpath(path, root)
-run(`open http://$host:$p/$(f == "." ? "" : f)`)
+const domain = host == localhost ? "localhost" : host
+run(`open http://$domain:$p/$(f == "." ? "" : f)`)
 
 handle_requests(logger(static(root, transform=transform, index="index.jl")), server)
