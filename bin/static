@@ -22,11 +22,24 @@ const root = isdir(path) ? path : dirname(path)
 
 # use late so we connect to the port ASAP
 @use "github.com/jkroso/HTTP.jl/server" handle_requests
-@use "github.com/coiljl/static" static ["transform.jl" transform]
+@use "github.com/jkroso/Browserify.jl" compile ReadFile WriteFile compiled_extension
+@use "github.com/coiljl/static" static
 @use "github.com/coiljl/logger" logger
 
 const f = relpath(path, root)
 const domain = host == localhost ? "localhost" : host
 run(`open http://$domain:$p/$(f == "." ? "" : f)`)
+
+transform(path::String) = begin
+  file = ReadFile(path)
+  rel = relpath(path, root)
+  outpath = joinpath(tempdir(), rel)
+  outdir = dirname(outpath)
+  ispath(outdir) || mkpath(outdir)
+  out = WriteFile(splitext(outpath)[1] * compiled_extension(file))
+  compile(file, out)
+  close(out.io)
+  string(out.path)
+end
 
 handle_requests(logger(static(root, transform=transform, index="index.jl")), server)
