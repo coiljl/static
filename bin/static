@@ -23,6 +23,7 @@ const root = isdir(path) ? path : dirname(path)
 # use late so we connect to the port ASAP
 @use "github.com/jkroso/HTTP.jl/server" handle_requests
 @use "github.com/jkroso/Browserify.jl" compile ReadFile WriteFile compiled_extension
+@use "github.com/jkroso/DOM.jl" => DOM @dom @css_str need
 @use "github.com/coiljl/static" static
 @use "github.com/coiljl/logger" logger
 
@@ -31,15 +32,39 @@ const domain = host == localhost ? "localhost" : host
 run(`open http://$domain:$p/$(f == "." ? "" : f)`)
 
 transform(path::String) = begin
-  file = ReadFile(path)
   rel = relpath(path, root)
-  outpath = joinpath(tempdir(), rel)
-  outdir = dirname(outpath)
-  ispath(outdir) || mkpath(outdir)
-  out = WriteFile(splitext(outpath)[1] * compiled_extension(file))
-  compile(file, out)
-  close(out.io)
-  string(out.path)
+  if isdir(path)
+    out = tempname()*".html"
+    open(out, "w") do io
+      show(io, MIME("text/html"), @dom[:html
+        [:head
+          [:title titlecase(replace(path, "-"=>" "))]
+          need(DOM.css[])]
+        [:body
+          [:div css"max-width: 50em; margin: 1em auto;"
+            @dom[:div css"""
+                      display: flex
+                      flex-direction: column
+                      margin: 10px auto
+                      width: max-content
+                      border: 1px solid lightgrey
+                      border-radius: 3px
+                      > a {padding: 3px 10px; font-size: 1.2em; border-bottom: 1px solid lightgrey}
+                      > a:last-child {border-bottom: none}
+                      """
+              (@dom[:a href=string(joinpath(rel, name)) name] for name in readdir(path))...]]]])
+    end
+    out
+  else
+    file = ReadFile(path)
+    outpath = joinpath(tempdir(), rel)
+    outdir = dirname(outpath)
+    ispath(outdir) || mkpath(outdir)
+    out = WriteFile(splitext(outpath)[1] * compiled_extension(file))
+    compile(file, out)
+    close(out.io)
+    string(out.path)
+  end
 end
 
 handle_requests(logger(static(root, transform=transform, index="index.jl")), server)
