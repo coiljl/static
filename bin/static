@@ -27,6 +27,7 @@ const root = isdir(path) ? path : dirname(path)
 @use "github.com/jkroso/DOM.jl/html"
 @use "github.com/coiljl/static" static
 @use "github.com/coiljl/logger" logger
+using Dates
 
 const f = relpath(path, root)
 const domain = host == localhost ? "localhost" : host
@@ -67,27 +68,40 @@ transform(path::String) = begin
   end
 end
 
-isimage(s) = s in ["svg", "jpg", "png", "ico"]
+isimage(s) = s in [".svg", ".jpg", ".jpeg", ".png", ".ico", ".gif"]
 loadsvg(name) = parse(MIME("text/html"), read("$(@dirname)/$name.svg", String))
+
+datasize(value::Number) = begin
+  power = max(1, round(Int, value > 0 ? log10(value) : 3) - 2)
+  suffix = ["B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"][power]
+  string(round(Int, 1e3*value / 1e3^power), suffix)
+end
 
 render_row(name, rel, dir) = begin
   path = joinpath(dir, name)
   data = stat(path)
-  text = @dom[:a href=string(joinpath(rel, name)) name]
   class = css"""
   display: inline-flex
   align-items: center
-  padding: 5 10
-  > svg {padding-right: 10}
+  padding: 5px 10px
+  > svg {margin-right: 10px}
+  > span {margin: 0 0 0 10px}
   """
   if isdir(data)
-    @dom[:span class=class loadsvg("file-directory") text]
-  elseif islink(data)
-    @dom[:span class=class loadsvg("file-symlink-file") text]
-  elseif isimage(splitext(name)[2])
-    @dom[:span class=class loadsvg("image") text]
+    @dom[:span class=class loadsvg("file-directory") [:a href=string(joinpath(rel, name)) name "/"]]
   else
-    @dom[:span class=class loadsvg("file") text]
+    type = if islink(data)
+      loadsvg("file-symlink-file")
+    elseif isimage(splitext(name)[2])
+      loadsvg("image")
+    else
+      loadsvg("file")
+    end
+    @dom[:span class=class
+      type
+      [:a href=string(joinpath(rel, name)) name]
+      [:span datasize(data.size)]
+      [:span Dates.format(unix2datetime(data.mtime), "HH:MM d/m/yyyy")]]
   end
 end
 
