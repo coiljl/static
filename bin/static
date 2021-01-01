@@ -24,6 +24,7 @@ const root = isdir(path) ? path : dirname(path)
 @use "github.com/jkroso/HTTP.jl/server" handle_requests
 @use "github.com/jkroso/Browserify.jl" compile ReadFile WriteFile compiled_extension
 @use "github.com/jkroso/DOM.jl" => DOM @dom @css_str need
+@use "github.com/jkroso/DOM.jl/html"
 @use "github.com/coiljl/static" static
 @use "github.com/coiljl/logger" logger
 
@@ -41,18 +42,17 @@ transform(path::String) = begin
           [:title titlecase(replace(path, "-"=>" "))]
           need(DOM.css[])]
         [:body
-          [:div css"max-width: 50em; margin: 1em auto;"
+          [:div css"max-width: 50em; margin: 1em auto; display: flex; height: 100%; font-family: verdana"
             @dom[:div css"""
                       display: flex
+                      align-self: center
                       flex-direction: column
                       margin: 10px auto
                       width: max-content
                       border: 1px solid lightgrey
                       border-radius: 3px
-                      > a {padding: 3px 10px; font-size: 1.2em; border-bottom: 1px solid lightgrey}
-                      > a:last-child {border-bottom: none}
                       """
-              (@dom[:a href=string(joinpath(rel, name)) name] for name in readdir(path))...]]]])
+              (render_row(name, rel, path) for name in readdir(path))...]]]])
     end
     out
   else
@@ -64,6 +64,30 @@ transform(path::String) = begin
     compile(file, out)
     close(out.io)
     string(out.path)
+  end
+end
+
+isimage(s) = s in ["svg", "jpg", "png", "ico"]
+loadsvg(name) = parse(MIME("text/html"), read("$(@dirname)/$name.svg", String))
+
+render_row(name, rel, dir) = begin
+  path = joinpath(dir, name)
+  data = stat(path)
+  text = @dom[:a href=string(joinpath(rel, name)) name]
+  class = css"""
+  display: inline-flex
+  align-items: center
+  padding: 5 10
+  > svg {padding-right: 10}
+  """
+  if isdir(data)
+    @dom[:span class=class loadsvg("file-directory") text]
+  elseif islink(data)
+    @dom[:span class=class loadsvg("file-symlink-file") text]
+  elseif isimage(splitext(name)[2])
+    @dom[:span class=class loadsvg("image") text]
+  else
+    @dom[:span class=class loadsvg("file") text]
   end
 end
 
