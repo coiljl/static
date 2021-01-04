@@ -43,13 +43,11 @@ transform(path::String) = begin
           [:title titlecase(replace(path, "-"=>" "))]
           need(DOM.css[])]
         [:body
-          [:div css"max-width: 50em; margin: 1em auto; display: flex; height: 100%; font-family: verdana"
+          [:div css"display: flex; height: 100%; font-family: verdana; justify-content: center"
             @dom[:div css"""
                       display: flex
                       align-self: center
                       flex-direction: column
-                      margin: 10px auto
-                      width: max-content
                       border: 1px solid lightgrey
                       border-radius: 3px
                       """
