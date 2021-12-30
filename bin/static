@@ -59,7 +59,7 @@ transform(path::String) = begin
     outpath = joinpath(tempdir(), rel)
     outdir = dirname(outpath)
     ispath(outdir) || mkpath(outdir)
-    out = WriteFile(splitext(outpath)[1] * compiled_extension(file))
+    out = WriteFile(first(split(outpath, '.')) * compiled_extension(file))
     compile(file, out)
     close(out.io)
     string(out.path)
@@ -90,7 +90,7 @@ render_row(name, rel, dir) = begin
   else
     type = if islink(data)
       loadsvg("file-symlink-file")
-    elseif isimage(splitext(name)[2])
+    elseif isimage(splitext(name)[end])
       loadsvg("image")
     else
       loadsvg("file")
